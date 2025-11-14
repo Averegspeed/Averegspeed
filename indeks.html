@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <title>Średnia prędkość A → B</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; padding:20px; max-width:760px; margin:auto;}
+    input, button { padding:8px; font-size:16px; margin:6px 0; width:100%; box-sizing:border-box;}
+    #map { height:300px; margin-top:10px; border:1px solid #ddd; }
+    .row { display:flex; gap:10px; }
+    .col { flex:1; }
+    #out { margin-top:12px; font-weight:600; }
+  </style>
+  <!-- Wklej poniżej swój klucz zamiast YOUR_API_KEY_HERE -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBX-HKAFN6PxJxnlECwdronbqulHWHZ9H4&libraries=places"></script>
+</head>
+<body>
+  <h1>Średnia prędkość A → B</h1>
+  <p>Wpisz punkty A i B (autouzupełnianie), wybierz tryb jazdy i podaj czas w minutach.</p>
+
+  <div class="row">
+    <div class="col">
+      <label>Punkt A</label>
+      <input id="from" placeholder="np. Rynek Główny, Kraków" />
+    </div>
+    <div class="col">
+      <label>Punkt B</label>
+      <input id="to" placeholder="np. Plac Zamkowy, Warszawa" />
+    </div>
+  </div>
+
+  <label>Tryb podróży</label>
+  <select id="mode">
+    <option value="DRIVING">Samochód</option>
+    <option value="BICYCLING">Rower</option>
+    <option value="WALKING">Pieszo</option>
+    <option value="TRANSIT">Transport publiczny</option>
+  </select>
+
+  <label>Czas, który masz (minuty)</label>
+  <input id="time" type="number" value="10" min="1" />
+
+  <button id="calcBtn">Oblicz wymaganą średnią prędkość</button>
+
+  <div id="out"></div>
+
+  <div id="map"></div>
+
+<script>
+let map, fromAutocomplete, toAutocomplete, directionsService, directionsRenderer;
+
+function initMapAndAutocomplete() {
+  map = new google.maps.Map(document.getElementById('map'), { center:{lat:52.237, lng:21.017}, zoom:6 });
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer({ map: map, suppressMarkers:false });
+
+  fromAutocomplete = new google.maps.places.Autocomplete(document.getElementById('from'));
+  toAutocomplete = new google.maps.places.Autocomplete(document.getElementById('to'));
+
+  document.getElementById('calcBtn').addEventListener('click', doCalc);
+}
+
+async function doCalc() {
+  const origin = document.getElementById('from').value;
+  const destination = document.getElementById('to').value;
+  const mode = document.getElementById('mode').value;
+  const timeMin = parseFloat(document.getElementById('time').value);
+
+  if(!origin || !destination || !timeMin || timeMin <= 0) {
+    document.getElementById('out').innerText = 'Wypełnij wszystkie pola poprawnie.';
+    return;
+  }
+
+  // Distance Matrix request
+  const service = new google.maps.DistanceMatrixService();
+  service.getDistanceMatrix({
+    origins: [origin],
+    destinations: [destination],
+    travelMode: mode
+  }, function(response, status) {
+    if (status !== 'OK') {
+      document.getElementById('out').innerText = 'Błąd Distance Matrix: ' + status;
+      return;
+    }
+    const element = response.rows[0].elements[0];
+    if(element.status !== 'OK') {
+      document.getElementById('out').innerText = 'Nie można obliczyć dystansu: ' + element.status;
+      return;
+    }
+    const distMeters = element.distance.value;
+    const distText = element.distance.text;
+    const distKm = distMeters / 1000;
+    const timeHours = timeMin / 60;
+    const speedKmh = distKm / timeHours;
+    const speedMs = (distMeters / (timeMin * 60)).toFixed(2);
+
+    document.getElementById('out').innerHTML =
+      `Dystans: ${distText} (${distKm.toFixed(2)} km)<br>` +
+      `W czasie ${timeMin} min potrzebna średnia prędkość: <strong>${speedKmh.toFixed(2)} km/h</strong> (` + 
+      `${speedMs} m/s).`;
+
+    // Show route on map (Directions API via DirectionsService)
+    directionsService.route({
+      origin: origin,
+      destination: destination,
+      travelMode: mode
+    }, function(res, st) {
+      if (st === 'OK') {
+        directionsRenderer.setDirections(res);
+      } else {
+        // ignore; map stays centered
+      }
+    });
+  });
+}
+
+// Inicjalizacja po załadowaniu skryptu Maps
+window.onload = initMapAndAutocomplete;
+</script>
+</body>
+</html>
