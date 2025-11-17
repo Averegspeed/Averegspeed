@@ -1,49 +1,21 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Obliczanie średniej prędkości + trasa</title>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 10px;
-        }
-        #map {
-            width: 100%;
-            height: 450px;
-            margin-top: 10px;
-            border: 2px solid #333;
-        }
-        input, button {
-            padding: 10px;
-            margin: 5px 0;
-            width: 100%;
-            font-size: 16px;
-        }
-        button {
-            background-color: #0a84ff;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #006bd6;
-        }
-        #wynik {
-            font-size: 18px;
-            margin-top: 15px;
-            padding: 10px;
-            background: #eee;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Średnia prędkość + trasa (rozszerzona)</title>
+<style>
+    body { font-family: Arial; margin: 0; padding: 10px; }
+    #map { width: 100%; height: 450px; margin-top: 10px; border: 2px solid #333; }
+    input, button, select { padding: 10px; margin: 5px 0; width: 100%; font-size: 16px; }
+    button { background-color: #0a84ff; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #006bd6; }
+    #wynik { font-size: 18px; margin-top: 15px; padding: 10px; background: #eee; }
+</style>
 </head>
-
 <body>
 
-<h2>Średnia prędkość + trasa na mapie</h2>
+<h2>Średnia prędkość + trasa (rozszerzona)</h2>
 
 <label>Punkt A:</label>
 <input id="start" type="text" placeholder="Wpisz miejsce startu">
@@ -53,6 +25,14 @@
 
 <label>Czas przejazdu (w minutach):</label>
 <input id="czas" type="number" placeholder="np. 12">
+
+<label>Tryb podróży:</label>
+<select id="tryb">
+    <option value="DRIVING">Auto</option>
+    <option value="BICYCLING">Rower</option>
+    <option value="WALKING">Pieszo</option>
+    <option value="TRANSIT">Komunikacja publiczna</option>
+</select>
 
 <button onclick="oblicz()">Oblicz</button>
 
@@ -83,27 +63,32 @@ function oblicz() {
     const start = document.getElementById("start").value;
     const end = document.getElementById("end").value;
     const czasMinuty = parseFloat(document.getElementById("czas").value);
+    const tryb = document.getElementById("tryb").value;
 
     if (!start || !end || !czasMinuty) {
         alert("Wypełnij wszystkie pola!");
         return;
     }
 
-    // Pobieramy dystans
+    // Distance Matrix API
     const service = new google.maps.DistanceMatrixService();
     service.getDistanceMatrix({
         origins: [start],
         destinations: [end],
-        travelMode: "DRIVING",
-    },
-    function(response, status) {
+        travelMode: tryb,
+    }, function(response, status) {
         if (status !== "OK") {
             alert("Błąd Distance Matrix: " + status);
             return;
         }
 
         const rezultat = response.rows[0].elements[0];
-        const dystans = rezultat.distance.value; // w metrach
+        if (rezultat.status !== "OK") {
+            alert("Nie można obliczyć dystansu: " + rezultat.status);
+            return;
+        }
+
+        const dystans = rezultat.distance.value; // metry
         const dystansKm = dystans / 1000;
         const czasGodziny = czasMinuty / 60;
         const srednia = dystansKm / czasGodziny;
@@ -112,16 +97,16 @@ function oblicz() {
             `<b>Dystans:</b> ${dystansKm.toFixed(2)} km<br>
              <b>Średnia prędkość:</b> ${srednia.toFixed(2)} km/h`;
 
-        // Rysujemy trasę
-        pokazTrase(start, end);
+        // Wyświetlamy trasę
+        pokazTrase(start, end, tryb);
     });
 }
 
-function pokazTrase(start, end) {
+function pokazTrase(start, end, tryb) {
     directionsService.route({
         origin: start,
         destination: end,
-        travelMode: "DRIVING"
+        travelMode: tryb
     }, function(result, status) {
         if (status === "OK") {
             directionsRenderer.setDirections(result);
@@ -133,7 +118,7 @@ function pokazTrase(start, end) {
 </script>
 
 <script async
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBX-HKAFN6PxJxnlECwdronbqulHWHZ9H4&libraries=places&callback=initMap">
+src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBX-HKAFN6PxJxnlECwdronbqulHWHZ9H4&libraries=places&callback=initMap">
 </script>
 
 </body>
