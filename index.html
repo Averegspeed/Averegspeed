@@ -1,122 +1,140 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="utf-8" />
-  <title>Średnia prędkość A → B</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    body { font-family: Arial, sans-serif; padding:20px; max-width:760px; margin:auto;}
-    input, button { padding:8px; font-size:16px; margin:6px 0; width:100%; box-sizing:border-box;}
-    #map { height:300px; margin-top:10px; border:1px solid #ddd; }
-    .row { display:flex; gap:10px; }
-    .col { flex:1; }
-    #out { margin-top:12px; font-weight:600; }
-  </style>
-  <!-- Wklej poniżej swój klucz zamiast YOUR_API_KEY_HERE -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBX-HKAFN6PxJxnlECwdronbqulHWHZ9H4&libraries=places"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obliczanie średniej prędkości + trasa</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+        }
+        #map {
+            width: 100%;
+            height: 450px;
+            margin-top: 10px;
+            border: 2px solid #333;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            font-size: 16px;
+        }
+        button {
+            background-color: #0a84ff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #006bd6;
+        }
+        #wynik {
+            font-size: 18px;
+            margin-top: 15px;
+            padding: 10px;
+            background: #eee;
+        }
+    </style>
 </head>
+
 <body>
-  <h1>Średnia prędkość A → B</h1>
-  <p>Wpisz punkty A i B (autouzupełnianie), wybierz tryb jazdy i podaj czas w minutach.</p>
 
-  <div class="row">
-    <div class="col">
-      <label>Punkt A</label>
-      <input id="from" placeholder="np. Rynek Główny, Kraków" />
-    </div>
-    <div class="col">
-      <label>Punkt B</label>
-      <input id="to" placeholder="np. Plac Zamkowy, Warszawa" />
-    </div>
-  </div>
+<h2>Średnia prędkość + trasa na mapie</h2>
 
-  <label>Tryb podróży</label>
-  <select id="mode">
-    <option value="DRIVING">Samochód</option>
-    <option value="BICYCLING">Rower</option>
-    <option value="WALKING">Pieszo</option>
-    <option value="TRANSIT">Transport publiczny</option>
-  </select>
+<label>Punkt A:</label>
+<input id="start" type="text" placeholder="Wpisz miejsce startu">
 
-  <label>Czas, który masz (minuty)</label>
-  <input id="time" type="number" value="10" min="1" />
+<label>Punkt B:</label>
+<input id="end" type="text" placeholder="Wpisz miejsce docelowe">
 
-  <button id="calcBtn">Oblicz wymaganą średnią prędkość</button>
+<label>Czas przejazdu (w minutach):</label>
+<input id="czas" type="number" placeholder="np. 12">
 
-  <div id="out"></div>
+<button onclick="oblicz()">Oblicz</button>
 
-  <div id="map"></div>
+<div id="wynik"></div>
+<div id="map"></div>
 
 <script>
-let map, fromAutocomplete, toAutocomplete, directionsService, directionsRenderer;
+let map;
+let directionsService;
+let directionsRenderer;
 
-function initMapAndAutocomplete() {
-  map = new google.maps.Map(document.getElementById('map'), { center:{lat:52.237, lng:21.017}, zoom:6 });
-  directionsService = new google.maps.DirectionsService();
-  directionsRenderer = new google.maps.DirectionsRenderer({ map: map, suppressMarkers:false });
-
-  fromAutocomplete = new google.maps.places.Autocomplete(document.getElementById('from'));
-  toAutocomplete = new google.maps.places.Autocomplete(document.getElementById('to'));
-
-  document.getElementById('calcBtn').addEventListener('click', doCalc);
-}
-
-async function doCalc() {
-  const origin = document.getElementById('from').value;
-  const destination = document.getElementById('to').value;
-  const mode = document.getElementById('mode').value;
-  const timeMin = parseFloat(document.getElementById('time').value);
-
-  if(!origin || !destination || !timeMin || timeMin <= 0) {
-    document.getElementById('out').innerText = 'Wypełnij wszystkie pola poprawnie.';
-    return;
-  }
-
-  // Distance Matrix request
-  const service = new google.maps.DistanceMatrixService();
-  service.getDistanceMatrix({
-    origins: [origin],
-    destinations: [destination],
-    travelMode: mode
-  }, function(response, status) {
-    if (status !== 'OK') {
-      document.getElementById('out').innerText = 'Błąd Distance Matrix: ' + status;
-      return;
-    }
-    const element = response.rows[0].elements[0];
-    if(element.status !== 'OK') {
-      document.getElementById('out').innerText = 'Nie można obliczyć dystansu: ' + element.status;
-      return;
-    }
-    const distMeters = element.distance.value;
-    const distText = element.distance.text;
-    const distKm = distMeters / 1000;
-    const timeHours = timeMin / 60;
-    const speedKmh = distKm / timeHours;
-    const speedMs = (distMeters / (timeMin * 60)).toFixed(2);
-
-    document.getElementById('out').innerHTML =
-      `Dystans: ${distText} (${distKm.toFixed(2)} km)<br>` +
-      `W czasie ${timeMin} min potrzebna średnia prędkość: <strong>${speedKmh.toFixed(2)} km/h</strong> (` + 
-      `${speedMs} m/s).`;
-
-    // Show route on map (Directions API via DirectionsService)
-    directionsService.route({
-      origin: origin,
-      destination: destination,
-      travelMode: mode
-    }, function(res, st) {
-      if (st === 'OK') {
-        directionsRenderer.setDirections(res);
-      } else {
-        // ignore; map stays centered
-      }
+function initMap() {
+    map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 52.2297, lng: 21.0122 }, // Warszawa
+        zoom: 7
     });
-  });
+
+    directionsService = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer();
+    directionsRenderer.setMap(map);
+
+    // Autocomplete
+    new google.maps.places.Autocomplete(document.getElementById("start"));
+    new google.maps.places.Autocomplete(document.getElementById("end"));
 }
 
-// Inicjalizacja po załadowaniu skryptu Maps
-window.onload = initMapAndAutocomplete;
+function oblicz() {
+    const start = document.getElementById("start").value;
+    const end = document.getElementById("end").value;
+    const czasMinuty = parseFloat(document.getElementById("czas").value);
+
+    if (!start || !end || !czasMinuty) {
+        alert("Wypełnij wszystkie pola!");
+        return;
+    }
+
+    // Pobieramy dystans
+    const service = new google.maps.DistanceMatrixService();
+    service.getDistanceMatrix({
+        origins: [start],
+        destinations: [end],
+        travelMode: "DRIVING",
+    },
+    function(response, status) {
+        if (status !== "OK") {
+            alert("Błąd Distance Matrix: " + status);
+            return;
+        }
+
+        const rezultat = response.rows[0].elements[0];
+        const dystans = rezultat.distance.value; // w metrach
+        const dystansKm = dystans / 1000;
+        const czasGodziny = czasMinuty / 60;
+        const srednia = dystansKm / czasGodziny;
+
+        document.getElementById("wynik").innerHTML =
+            `<b>Dystans:</b> ${dystansKm.toFixed(2)} km<br>
+             <b>Średnia prędkość:</b> ${srednia.toFixed(2)} km/h`;
+
+        // Rysujemy trasę
+        pokazTrase(start, end);
+    });
+}
+
+function pokazTrase(start, end) {
+    directionsService.route({
+        origin: start,
+        destination: end,
+        travelMode: "DRIVING"
+    }, function(result, status) {
+        if (status === "OK") {
+            directionsRenderer.setDirections(result);
+        } else {
+            alert("Nie mogę wyświetlić trasy: " + status);
+        }
+    });
+}
 </script>
+
+<script async
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBX-HKAFN6PxJxnlECwdronbqulHWHZ9H4&libraries=places&callback=initMap">
+</script>
+
 </body>
 </html>
